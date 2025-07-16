@@ -1,14 +1,16 @@
 # view.py
+import os
 
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                             QTextEdit, QProgressBar, QMessageBox, QDialog)
-from PyQt5.QtCore import QThread
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+                             QTextEdit, QProgressBar, QMessageBox, QDialog, QTextBrowser)
+from PyQt5.QtCore import QThread, QSize
 from functools import partial
 
 # --- [파일 분리] ---
 from worker import Worker
 from dialog import SelectDataPartitionDialog
+
 
 class View(QWidget):
     def __init__(self):
@@ -22,24 +24,30 @@ class View(QWidget):
         self.text_widget = QTextEdit(self)
         self.text_widget.setReadOnly(True)
         self.text_widget.setStyleSheet("border: 1px solid black;")
-        self.text_widget.setFixedHeight(240)
+        self.text_widget.setFixedHeight(200)
         main_layout.addWidget(self.text_widget)
 
+        self.info_browser = QTextBrowser(self)
+        self.info_browser.setReadOnly(True)
+        self.info_browser.setStyleSheet("border: 1px solid black;")
+        self.info_browser.setFixedHeight(80)
+        main_layout.addWidget(self.info_browser)
+
         button_layout = QVBoxLayout()
-        
+
         self.mode_buttons_dict = {}
         self.data_buttons_dict = {}
 
         self.mode_names = ["업무용", "인터넷용", "출장용", "K자회사"]
         data_names = ["데이터 보존", "데이터 삭제"]
-        
+
         grid_rows = [QHBoxLayout(), QHBoxLayout()]
         for i, name in enumerate(self.mode_names):
             btn = QPushButton(name, self)
             btn.setCheckable(True)
             self.mode_buttons_dict[name] = btn
             grid_rows[i // 2].addWidget(btn)
-        
+
         button_layout.addLayout(grid_rows[0])
         button_layout.addLayout(grid_rows[1])
 
@@ -74,17 +82,20 @@ class View(QWidget):
         mode_button_group = list(self.mode_buttons_dict.values())
         for btn in mode_button_group:
             btn.clicked.connect(partial(self.on_button_group_clicked, mode_button_group, btn))
-        
+
         data_button_group = list(self.data_buttons_dict.values())
         for btn in data_button_group:
             btn.clicked.connect(partial(self.on_button_group_clicked, data_button_group, btn))
 
         self.start_button.clicked.connect(self.start_stop_worker)
+        self.update_info()
         self.start_worker()
-    
+
     def on_button_group_clicked(self, button_group, clicked_button):
         for btn in button_group:
             btn.setChecked(btn == clicked_button)
+        if clicked_button in self.mode_buttons_dict.values():
+            self.update_info()
 
     def enable_buttons(self, exist_folders):
         self.start_button.setEnabled(True)
@@ -156,7 +167,7 @@ class View(QWidget):
             if btn.isChecked():
                 self.worker.path = self.mode_names.index(name)
                 break
-        
+
         preserve_btn = self.data_buttons_dict["데이터 보존"]
         self.worker.save = preserve_btn.isEnabled() and preserve_btn.isChecked()
         self.worker.start()
@@ -164,16 +175,16 @@ class View(QWidget):
     def stop_worker(self):
         if self.worker:
             self.worker.stop()
-        
+
         all_buttons = list(self.mode_buttons_dict.values()) + list(self.data_buttons_dict.values())
         for btn in all_buttons:
             btn.setChecked(False)
-        
+
         self.toggle_buttons_enabled(True)
         self.start_button.setText("시작")
         self.progress_bar.setValue(0)
         self.text_widget.clear()
-        
+
         self.init_ui()
 
     def toggle_buttons_enabled(self, state):
@@ -181,6 +192,52 @@ class View(QWidget):
         for btn in all_buttons:
             if not btn.isChecked():
                 btn.setEnabled(state)
+
+    def _parse_info_file(self):
+        """info.txt 파일을 파싱하여 self.info_content 딕셔너리에 저장합니다."""
+        self.info_content = {}
+        info_file_path = r"..\wim\info.txt"
+
+        try:
+            with open(info_file_path, "r", encoding="utf-8") as f:
+                current_key = None
+                content_buffer = []
+                for line in f:
+                    stripped_line = line.strip()
+                    if stripped_line.startswith('[') and stripped_line.endswith(']'):
+                        if current_key and content_buffer:
+                            self.info_content[current_key] = '\n'.join(content_buffer).strip()
+                        current_key = stripped_line[1:-1]
+                        content_buffer = []
+                    elif current_key:
+                        content_buffer.append(line.strip())  # 불필요한 공백 제거
+
+                # 파일의 마지막 섹션 저장
+                if current_key and content_buffer:
+                    self.info_content[current_key] = '\n'.join(content_buffer).strip()
+
+        except FileNotFoundError:
+            self.info_browser.setText(f"설명 파일을 찾을 수 없습니다.\n경로: {os.path.abspath(info_file_path)}")
+        except Exception as e:
+            self.info_browser.setText(f"설명 파일 로딩 중 오류 발생:\n{e}")
+
+    def update_info(self):
+        """선택된 용도에 따라 설명창의 내용을 업데이트합니다."""
+
+        self._parse_info_file()
+        selected_mode = None
+        for mode, btn in self.mode_buttons_dict.items():
+            if btn.isChecked():
+                selected_mode = mode
+                break
+
+        if selected_mode:
+            # 파싱된 딕셔너리에서 내용 가져오기
+            info_text = self.info_content.get(selected_mode, f"'{selected_mode}'에 대한 설명을 찾을 수 없습니다.")
+            self.info_browser.setText(info_text)
+        else:
+            # 아무것도 선택되지 않았을 때
+            self.info_browser.setText("용도 선택은 필수입니다.")
 
     def update_log(self, log_message):
         self.text_widget.append(log_message)
