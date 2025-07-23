@@ -118,6 +118,9 @@ class View(QWidget):
             if not preserve_btn.isEnabled() or delete_btn.isChecked():
                 dialog = ConfirmDeleteDialog(self)
                 if dialog.exec_() != QDialog.Accepted:
+                    # '취소'를 눌렀거나 창을 닫았을 경우, 데이터 보존을 다시 선택
+                    preserve_btn.setChecked(True)
+                    delete_btn.setChecked(False)
                     return
             self.run_setup()
         else:
