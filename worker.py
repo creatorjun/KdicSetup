@@ -59,7 +59,7 @@ class Worker(QThread):
                 stderr=subprocess.PIPE, text=True,
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
-            self.current_process = process # --- [로직 추가] ---
+            self.current_process = process
 
             while self.is_running:
                 output = process.stdout.readline()
@@ -74,7 +74,7 @@ class Worker(QThread):
                 self.log_signal.emit(f"오류 발생 (코드: {rc}): {command}\n{error_output}")
             return rc == 0
         finally:
-            self.current_process = None # --- [로직 추가] ---
+            self.current_process = None
 
     def set_selected_data_volume(self, volume_number):
         """사용자가 선택한 데이터 볼륨을 설정하고 데이터 보존을 활성화합니다."""
@@ -408,7 +408,6 @@ class Worker(QThread):
 
         if self.current_process and self.current_process.poll() is None:
             logging.info(f"Attempting to terminate process with PID: {self.current_process.pid}")
-            # 자식 프로세스까지 모두 강제 종료 (/T 옵션)
             kill_command = f"taskkill /F /PID {self.current_process.pid} /T"
             subprocess.run(kill_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self.current_process = None

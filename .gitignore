@@ -1,4 +1,12 @@
-dist
-.venv
-wim
-log.txt
+__pycache__
+.idea/
+venv/
+.venv/
+build/
+wim/
+dist/
+
+*.txt
+*.log
+*.pyc
+*.spec
