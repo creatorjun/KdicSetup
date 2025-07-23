@@ -1,7 +1,7 @@
 # dialog.py
 
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QListWidget, 
-                             QListWidgetItem, QDialogButtonBox)
+                             QListWidgetItem, QDialogButtonBox, QLabel, QLineEdit)
 from PyQt5.QtCore import Qt
 
 class SelectDataPartitionDialog(QDialog):
@@ -40,3 +40,27 @@ class SelectDataPartitionDialog(QDialog):
             self.button_box.button(QDialogButtonBox.Ok).setEnabled(True)
             # 선택된 아이템의 볼륨 번호를 저장
             self.selected_partition = self.list_widget.selectedItems()[0].data(Qt.UserRole)
+
+class ConfirmDeleteDialog(QDialog):
+    """'y'를 입력해야 확인되는 데이터 삭제 확인 다이얼로그"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("경고")
+        layout = QVBoxLayout(self)
+
+        message_label = QLabel("모든 데이터가 삭제 됩니다.\n진행하려면 'y'를 입력하세요.", self)
+        layout.addWidget(message_label)
+
+        self.input_line = QLineEdit(self)
+        self.input_line.textChanged.connect(self.on_text_changed)
+        layout.addWidget(self.input_line)
+
+        # Cancel 버튼만 있는 버튼 박스
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Cancel)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+    def on_text_changed(self, text):
+        """입력 텍스트가 'y'이면 다이얼로그를 수락(accept)"""
+        if text.lower() == 'y' or text() == 'ㅛ':
+            self.accept()

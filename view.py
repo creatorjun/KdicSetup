@@ -9,7 +9,7 @@ from functools import partial
 
 # --- [파일 분리] ---
 from worker import Worker
-from dialog import SelectDataPartitionDialog
+from dialog import SelectDataPartitionDialog, ConfirmDeleteDialog
 
 
 class View(QWidget):
@@ -116,10 +116,8 @@ class View(QWidget):
             delete_btn = self.data_buttons_dict["데이터 삭제"]
 
             if not preserve_btn.isEnabled() or delete_btn.isChecked():
-                if QMessageBox.warning(
-                        self, "경고", "모든 데이터가 삭제 됩니다. 그래도 진행하시겠습니까?",
-                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-                ) == QMessageBox.No:
+                dialog = ConfirmDeleteDialog(self)
+                if dialog.exec_() != QDialog.Accepted:
                     return
             self.run_setup()
         else:
