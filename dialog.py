@@ -41,26 +41,65 @@ class SelectDataPartitionDialog(QDialog):
             # 선택된 아이템의 볼륨 번호를 저장
             self.selected_partition = self.list_widget.selectedItems()[0].data(Qt.UserRole)
 
+# dialog.py
+
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QListWidget,
+                             QListWidgetItem, QDialogButtonBox, QLabel, QLineEdit)
+from PyQt5.QtCore import Qt
+
+class SelectDataPartitionDialog(QDialog):
+    def __init__(self, partitions, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("데이터 파티션 선택")
+        self.setMinimumWidth(350)
+
+        self.selected_partition = None
+        layout = QVBoxLayout(self)
+
+        self.list_widget = QListWidget()
+        for p in partitions:
+            item_text = f"드라이브: {p['letter']} (수정된 날짜: {p['date']})"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, p['number'])
+            self.list_widget.addItem(item)
+
+        self.list_widget.itemSelectionChanged.connect(self.on_selection_changed)
+        layout.addWidget(self.list_widget)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+        self.button_box.button(QDialogButtonBox.Ok).setEnabled(False)
+
+    def on_selection_changed(self):
+        if self.list_widget.selectedItems():
+            self.button_box.button(QDialogButtonBox.Ok).setEnabled(True)
+            self.selected_partition = self.list_widget.selectedItems()[0].data(Qt.UserRole)
+
 class ConfirmDeleteDialog(QDialog):
-    """'y' 또는 'ㅛ' 키를 눌러야 확인되는 데이터 삭제 확인 다이얼로그"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("경고")
         layout = QVBoxLayout(self)
 
-        message_label = QLabel("모든 데이터가 삭제 됩니다.\n진행하려면 'y' 또는 'ㅛ'를 누르세요.", self)
-        layout.addWidget(message_label)
+        self.message_label = QLabel("모든 데이터가 삭제됩니다.\n진행하려면 비밀번호 '960601'를 입력하세요.", self)
+        layout.addWidget(self.message_label)
 
-        # '취소' 버튼만 있는 버튼 박스
-        buttons = QDialogButtonBox(QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Cancel).setText("취소")
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self.password_input = QLineEdit(self)
+        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.textChanged.connect(self.check_password)
+        layout.addWidget(self.password_input)
 
-    def keyPressEvent(self, event):
-        """키보드 입력을 감지하는 이벤트 핸들러"""
-        # 'y' 또는 'Y' 또는 'ㅛ' 키를 누르면 accept
-        if event.key() == Qt.Key_Y or event.text() == 'ㅛ':
-            self.accept()
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        self.button_box.button(QDialogButtonBox.Ok).setEnabled(False)
+        layout.addWidget(self.button_box)
+
+    def check_password(self, text):
+        if text == "960601":
+            self.button_box.button(QDialogButtonBox.Ok).setEnabled(True)
         else:
-            super().keyPressEvent(event)
+            self.button_box.button(QDialogButtonBox.Ok).setEnabled(False)

@@ -1,12 +1,12 @@
-2025-07-16 14:24:18 - Executing diskpart script:
+2025-07-28 17:42:35 - Executing diskpart script:
 --- SCRIPT ---
 list vol
 --------------
-2025-07-16 14:24:18 - Executing diskpart script:
+2025-07-28 17:42:37 - Executing diskpart script:
 --- SCRIPT ---
 list disk
 --------------
-2025-07-16 14:24:18 - Executing diskpart script:
+2025-07-28 17:42:37 - Executing diskpart script:
 --- SCRIPT ---
 sel disk 0
 detail disk

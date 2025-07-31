@@ -7,6 +7,7 @@ import string
 import logging
 import pythoncom
 import subprocess
+import shutil
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
@@ -39,7 +40,6 @@ class Worker(QThread):
         self.stage3 = None
 
     def _setup_logger(self):
-        """로그 파일 설정을 초기화하는 함수"""
         log_file = 'log.txt'
         if os.path.exists(log_file):
             os.remove(log_file)
@@ -69,7 +69,7 @@ class Worker(QThread):
                     break
             
             rc = process.poll()
-            if rc != 0 and self.is_running: # 중지 버튼으로 종료된 경우는 오류 로그를 남기지 않음
+            if rc != 0 and self.is_running:
                 error_output = process.stderr.read()
                 self.log_signal.emit(f"오류 발생 (코드: {rc}): {command}\n{error_output}")
             return rc == 0
@@ -77,7 +77,6 @@ class Worker(QThread):
             self.current_process = None
 
     def set_selected_data_volume(self, volume_number):
-        """사용자가 선택한 데이터 볼륨을 설정하고 데이터 보존을 활성화합니다."""
         logging.debug(f"User selected data volume: {volume_number}")
         self.data_volume = volume_number
         if self.target_volume and self.data_volume:
@@ -100,13 +99,15 @@ class Worker(QThread):
             self.log_signal.emit("현재 시스템을 출장용으로 초기화합니다.")
         else :
             self.log_signal.emit("현재 시스템을 K자회사용으로 초기화합니다.")
-
+        
+        self.backup_sticky_notes()
         self.remove_drive_letter()
         self.run_format()
         if self.stage1:
             self.apply_wim()
         if self.stage2:
             self.set_kdic_folder()
+            self.restore_sticky_notes()
             self.set_drivers()
             self.copy_drivers()
             self.set_boot()
@@ -118,11 +119,11 @@ class Worker(QThread):
         try:
             process = subprocess.Popen(["diskpart"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            self.current_process = process # --- [로직 추가] ---
+            self.current_process = process
             stdout, stderr = process.communicate(input=commands)
             return stdout
         finally:
-            self.current_process = None # --- [로직 추가] ---
+            self.current_process = None
 
     def run_format(self):
         script_file = 'diskpart_script.txt'
@@ -201,6 +202,13 @@ class Worker(QThread):
         copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ'
         self._run_command(copy_command)
 
+    def copy_network(self):
+        driver_path = self.get_driver_path()
+        source_path = rf'..\drivers\network'
+        destination_path = r'C:\SEPR\Drivers'
+        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ'
+        self._run_command(copy_command)
+
     def set_boot(self):
         bcd_command = r'bcdboot C:\Windows /s Z: /f UEFI'
         self.stage3 = self._run_command(bcd_command, lambda out: self.log_signal.emit(out.strip()))
@@ -213,6 +221,39 @@ class Worker(QThread):
         destination_path = r'D:\kdic'
         copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ'
         self._run_command(copy_command)
+
+    def backup_sticky_notes(self):
+        self.log_signal.emit("스티커 메모 백업을 시작합니다.")
+        source_file = os.path.expandvars(r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState\plum.sqlite')
+        temp_dir = os.path.join(os.getcwd(), 'temp')
+        
+        try:
+            if os.path.exists(source_file):
+                os.makedirs(temp_dir, exist_ok=True)
+                shutil.copy2(source_file, temp_dir)
+                self.log_signal.emit("스티커 메모 백업이 완료되었습니다.")
+            else:
+                self.log_signal.emit("백업할 스티커 메모 파일을 찾지 못했습니다.")
+        except Exception as e:
+            self.log_signal.emit(f"스티커 메모 백업 중 오류가 발생했습니다: {e}")
+
+    def restore_sticky_notes(self):
+        self.log_signal.emit("스티커 메모 복원을 시작합니다.")
+        backup_file = os.path.join(os.getcwd(), 'temp', 'plum.sqlite')
+        destination_dir = r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState'
+        
+        try:
+            if os.path.exists(backup_file):
+                os.makedirs(destination_dir, exist_ok=True)
+                copy_command = f'copy "{backup_file}" "{destination_dir}"'
+                if self._run_command(copy_command):
+                    self.log_signal.emit("스티커 메모 복원이 완료되었습니다.")
+                else:
+                    self.log_signal.emit("스티커 메모 복원에 실패했습니다.")
+            else:
+                self.log_signal.emit("복원할 스티커 메모 백업 파일을 찾지 못했습니다.")
+        except Exception as e:
+            self.log_signal.emit(f"스티커 메모 복원 중 오류가 발생했습니다: {e}")
 
     def set_unattend(self):
         if self.stage3:
@@ -399,7 +440,6 @@ class Worker(QThread):
             self.log_signal.emit("설치 가능한 시스템 디스크(100GB 이상)가 없습니다.")
 
     def stop(self):
-        """작업자 스레드를 중지하고 실행 중인 외부 프로세스를 강제 종료합니다."""
         if not self.is_running:
             return
 
