@@ -69,10 +69,21 @@ class Worker(QThread):
                     break
             
             rc = process.poll()
-            if rc != 0 and self.is_running:
-                error_output = process.stderr.read()
-                self.log_signal.emit(f"오류 발생 (코드: {rc}): {command}\n{error_output}")
-            return rc == 0
+
+            is_robocopy = command.strip().lower().startswith('robocopy')
+
+            if is_robocopy:
+                # robocopy의 경우, 종료 코드가 8 미만이면 성공으로 간주
+                if rc >= 8 and self.is_running:
+                    error_output = process.stderr.read()
+                    self.log_signal.emit(f"Robocopy 오류 발생 (코드: {rc}): {command}\n{error_output}")
+                return rc < 8
+            else:
+                # 다른 명령어의 경우, 0이 아닌 모든 코드를 오류로 간주
+                if rc != 0 and self.is_running:
+                    error_output = process.stderr.read()
+                    self.log_signal.emit(f"오류 발생 (코드: {rc}): {command}\n{error_output}")
+                return rc == 0
         finally:
             self.current_process = None
 
