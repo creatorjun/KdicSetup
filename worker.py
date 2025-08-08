@@ -199,14 +199,14 @@ class Worker(QThread):
         driver_path = self.get_driver_path()
         source_path = rf'..\drivers\{driver_path}'
         destination_path = r'C:\SEPR\Drivers'
-        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ'
+        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
         self._run_command(copy_command)
 
     def copy_network(self):
         driver_path = self.get_driver_path()
         source_path = rf'..\drivers\network'
         destination_path = r'C:\SEPR\Drivers'
-        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ'
+        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
         self._run_command(copy_command)
 
     def set_boot(self):
@@ -219,41 +219,50 @@ class Worker(QThread):
     def set_kdic_folder(self):
         source_path = r'C:\Users\kdic'
         destination_path = r'D:\kdic'
-        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ'
+        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
         self._run_command(copy_command)
 
     def backup_sticky_notes(self):
-        self.log_signal.emit("스티커 메모 백업을 시작합니다.")
-        source_file = os.path.expandvars(r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState\plum.sqlite')
-        temp_dir = os.path.join(os.getcwd(), 'temp')
+        self.log_signal.emit("스티커 메모 폴더 백업을 시작합니다 (Robocopy 사용).")
+        source_dir = os.path.expandvars(r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState')
+        # 백업 파일을 저장할 목적지 폴더 (예: temp\StickyNotesBackup)
+        backup_dest_dir = os.path.join(os.getcwd(), 'temp', 'StickyNotesBackup')
         
         try:
-            if os.path.exists(source_file):
-                os.makedirs(temp_dir, exist_ok=True)
-                shutil.copy2(source_file, temp_dir)
-                self.log_signal.emit("스티커 메모 백업이 완료되었습니다.")
+            if os.path.exists(source_dir):
+                # Robocopy 명령어 생성: /E (하위 폴더 포함), /COPYALL (모든 파일 정보 복사), /XJ (정션 포인트 제외)
+                copy_command = f'robocopy "{source_dir}" "{backup_dest_dir}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
+                if self._run_command(copy_command):
+                    self.log_signal.emit("스티커 메모 폴더 백업이 완료되었습니다.")
+                else:
+                    self.log_signal.emit("스티커 메모 폴더 백업 중 오류가 발생했습니다.")
             else:
-                self.log_signal.emit("백업할 스티커 메모 파일을 찾지 못했습니다.")
+                self.log_signal.emit("백업할 스티커 메모 폴더를 찾지 못했습니다.")
         except Exception as e:
-            self.log_signal.emit(f"스티커 메모 백업 중 오류가 발생했습니다: {e}")
+            self.log_signal.emit(f"스티커 메모 폴더 백업 중 예외가 발생했습니다: {e}")
 
     def restore_sticky_notes(self):
-        self.log_signal.emit("스티커 메모 복원을 시작합니다.")
-        backup_file = os.path.join(os.getcwd(), 'temp', 'plum.sqlite')
+        self.log_signal.emit("스티커 메모 폴더 복원을 시작합니다 (Robocopy 사용).")
+        # 백업된 파일이 저장된 소스 폴더
+        backup_source_dir = os.path.join(os.getcwd(), 'temp', 'StickyNotesBackup')
+        # 복원할 목적지 폴더
         destination_dir = r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState'
         
         try:
-            if os.path.exists(backup_file):
+            if os.path.exists(backup_source_dir):
+                # 복원할 최종 목적지 폴더가 없을 경우 생성
                 os.makedirs(destination_dir, exist_ok=True)
-                copy_command = f'copy "{backup_file}" "{destination_dir}"'
+                
+                # Robocopy 명령어 생성
+                copy_command = f'robocopy "{backup_source_dir}" "{destination_dir}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
                 if self._run_command(copy_command):
-                    self.log_signal.emit("스티커 메모 복원이 완료되었습니다.")
+                    self.log_signal.emit("스티커 메모 폴더 복원이 완료되었습니다.")
                 else:
-                    self.log_signal.emit("스티커 메모 복원에 실패했습니다.")
+                    self.log_signal.emit("스티커 메모 폴더 복원에 실패했습니다.")
             else:
-                self.log_signal.emit("복원할 스티커 메모 백업 파일을 찾지 못했습니다.")
+                self.log_signal.emit("복원할 스티커 메모 백업 폴더를 찾지 못했습니다.")
         except Exception as e:
-            self.log_signal.emit(f"스티커 메모 복원 중 오류가 발생했습니다: {e}")
+            self.log_signal.emit(f"스티커 메모 폴더 복원 중 예외가 발생했습니다: {e}")
 
     def set_unattend(self):
         if self.stage3:
