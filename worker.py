@@ -227,7 +227,6 @@ class Worker(QThread):
         self._run_command(copy_command)
 
     def backup_sticky_notes(self):
-        self.log_signal.emit("스티커 메모 폴더 백업을 시작합니다 (Robocopy 사용).")
         source_dir = os.path.expandvars(r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState')
         # 백업 파일을 저장할 목적지 폴더 (예: temp\StickyNotesBackup)
         backup_dest_dir = os.path.join(os.getcwd(), 'temp')
