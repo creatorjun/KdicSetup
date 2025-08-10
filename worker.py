@@ -7,7 +7,6 @@ import string
 import logging
 import pythoncom
 import subprocess
-import shutil
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
@@ -111,14 +110,16 @@ class Worker(QThread):
         else :
             self.log_signal.emit("현재 시스템을 K자회사용으로 초기화합니다.")
         
-        self.backup_sticky_notes()
+        if self.save:
+            self.backup_sticky_notes()
         self.remove_drive_letter()
         self.run_format()
         if self.stage1:
             self.apply_wim()
         if self.stage2:
             self.set_kdic_folder()
-            self.restore_sticky_notes()
+            if self.save:
+                self.restore_sticky_notes()
             self.set_drivers()
             self.copy_drivers()
             self.set_boot()
@@ -182,7 +183,6 @@ class Worker(QThread):
 
     def apply_wim(self):
         wim_path = self.set_image_path()
-        self.log_signal.emit(f'현재 시스템에 {os.path.basename(wim_path)} 이미지를 적용합니다.')
         info_file = r'..\wim\info.txt'
         try:
             with open(info_file, 'r', encoding='utf-8') as f:
@@ -213,13 +213,6 @@ class Worker(QThread):
         copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
         self._run_command(copy_command)
 
-    def copy_network(self):
-        driver_path = self.get_driver_path()
-        source_path = rf'..\drivers\network'
-        destination_path = r'C:\SEPR\Drivers'
-        copy_command = f'robocopy "{source_path}" "{destination_path}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
-        self._run_command(copy_command)
-
     def set_boot(self):
         bcd_command = r'bcdboot C:\Windows /s Z: /f UEFI'
         self.stage3 = self._run_command(bcd_command, lambda out: self.log_signal.emit(out.strip()))
@@ -237,25 +230,24 @@ class Worker(QThread):
         self.log_signal.emit("스티커 메모 폴더 백업을 시작합니다 (Robocopy 사용).")
         source_dir = os.path.expandvars(r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState')
         # 백업 파일을 저장할 목적지 폴더 (예: temp\StickyNotesBackup)
-        backup_dest_dir = os.path.join(os.getcwd(), 'temp', 'StickyNotesBackup')
+        backup_dest_dir = os.path.join(os.getcwd(), 'temp')
         
         try:
             if os.path.exists(source_dir):
                 # Robocopy 명령어 생성: /E (하위 폴더 포함), /COPYALL (모든 파일 정보 복사), /XJ (정션 포인트 제외)
                 copy_command = f'robocopy "{source_dir}" "{backup_dest_dir}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
                 if self._run_command(copy_command):
-                    self.log_signal.emit("스티커 메모 폴더 백업이 완료되었습니다.")
+                    pass
                 else:
                     self.log_signal.emit("스티커 메모 폴더 백업 중 오류가 발생했습니다.")
             else:
-                self.log_signal.emit("백업할 스티커 메모 폴더를 찾지 못했습니다.")
+                pass
         except Exception as e:
             self.log_signal.emit(f"스티커 메모 폴더 백업 중 예외가 발생했습니다: {e}")
 
     def restore_sticky_notes(self):
-        self.log_signal.emit("스티커 메모 폴더 복원을 시작합니다 (Robocopy 사용).")
         # 백업된 파일이 저장된 소스 폴더
-        backup_source_dir = os.path.join(os.getcwd(), 'temp', 'StickyNotesBackup')
+        backup_source_dir = os.path.join(os.getcwd(), 'temp')
         # 복원할 목적지 폴더
         destination_dir = r'C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState'
         
@@ -267,17 +259,19 @@ class Worker(QThread):
                 # Robocopy 명령어 생성
                 copy_command = f'robocopy "{backup_source_dir}" "{destination_dir}" /E /COPYALL /XJ /MT:32 /R:1 /W:1 /NP /NJS /NJH'
                 if self._run_command(copy_command):
-                    self.log_signal.emit("스티커 메모 폴더 복원이 완료되었습니다.")
+                    pass
                 else:
                     self.log_signal.emit("스티커 메모 폴더 복원에 실패했습니다.")
             else:
-                self.log_signal.emit("복원할 스티커 메모 백업 폴더를 찾지 못했습니다.")
+                pass
         except Exception as e:
             self.log_signal.emit(f"스티커 메모 폴더 복원 중 예외가 발생했습니다: {e}")
 
     def set_unattend(self):
-        if self.stage3:
-            source_path = r'..\wim\unattend.xml'
+        if self.stage3:    
+            source_path = r'..\wim\work.xml'
+            if self.path == 2:
+                source_path = r"..\wim\trip.xml"
             destination_path = r'C:\windows\system32\sysprep\unattend.xml'
             copy_command = f'copy "{source_path}" "{destination_path}"'
             def unattend_callback(output):
