@@ -2,6 +2,7 @@
 import os
 
 from PyQt5.QtGui import QIcon
+# QCheckBox를 QPushButton으로 변경하므로 QCheckBox import는 더 이상 필요 없습니다.
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTextEdit, QProgressBar, QMessageBox, QDialog, QTextBrowser)
 from PyQt5.QtCore import QThread, QSize
@@ -58,8 +59,18 @@ class View(QWidget):
             self.data_buttons_dict[name] = btn
             data_row.addWidget(btn)
         button_layout.addLayout(data_row)
-
+        
         main_layout.addLayout(button_layout)
+
+        # '비트라커 설정'을 QPushButton으로 생성합니다.
+        self.bitlocker_button = QPushButton("비트라커 설정", self)
+        self.bitlocker_button.setCheckable(True) # 버튼을 선택/해제 가능하도록 설정
+        
+        # 버튼을 가로로 꽉 채우기 위해 QHBoxLayout을 사용합니다.
+        bitlocker_row = QHBoxLayout()
+        bitlocker_row.addWidget(self.bitlocker_button)
+        main_layout.addLayout(bitlocker_row)
+
 
         self.start_button = QPushButton("시작", self)
         main_layout.addWidget(self.start_button)
@@ -76,6 +87,7 @@ class View(QWidget):
 
     def init_ui(self):
         self.start_button.setEnabled(False)
+        self.bitlocker_button.setEnabled(False) # 비트라커 버튼 초기 상태 비활성화
         for btn in self.data_buttons_dict.values():
             btn.setEnabled(False)
 
@@ -86,6 +98,8 @@ class View(QWidget):
         data_button_group = list(self.data_buttons_dict.values())
         for btn in data_button_group:
             btn.clicked.connect(partial(self.on_button_group_clicked, data_button_group, btn))
+        
+        # 비트라커 버튼은 다른 그룹과 독립적으로 동작하므로 그룹핑에서 제외
 
         self.start_button.clicked.connect(self.start_stop_worker)
         self.update_info()
@@ -118,7 +132,6 @@ class View(QWidget):
             if not preserve_btn.isEnabled() or delete_btn.isChecked():
                 dialog = ConfirmDeleteDialog(self)
                 if dialog.exec_() != QDialog.Accepted:
-                    # '취소'를 눌렀거나 창을 닫았을 경우, 데이터 보존을 다시 선택
                     preserve_btn.setChecked(True)
                     delete_btn.setChecked(False)
                     return
@@ -143,15 +156,14 @@ class View(QWidget):
         self.progress_bar.setMaximum(0)
 
     def handle_multiple_data_partitions(self, partitions):
-        """여러 데이터 파티션이 감지되었을 때 선택 다이얼로그를 띄웁니다."""
         dialog = SelectDataPartitionDialog(partitions, self)
         if dialog.exec_() == QDialog.Accepted:
             selected_volume = dialog.selected_partition
             if selected_volume:
                 self.worker.set_selected_data_volume(selected_volume)
         else:
-            self.log_signal.emit("파티션 선택이 취소되었습니다. 데이터 보존이 불가능합니다.")
-            self.data_signal.emit(False)
+            self.update_log("파티션 선택이 취소되었습니다. 데이터 보존이 불가능합니다.")
+            self.enable_buttons(False)
 
     def on_load_finished(self):
         self.progress_bar.setMaximum(100)
@@ -171,6 +183,9 @@ class View(QWidget):
 
         preserve_btn = self.data_buttons_dict["데이터 보존"]
         self.worker.save = preserve_btn.isEnabled() and preserve_btn.isChecked()
+        
+        # '비트라커 설정' 버튼의 체크 상태를 worker에 전달
+        self.worker.enable_bitlocker = self.bitlocker_button.isChecked()
         self.worker.start()
 
     def stop_worker(self):
@@ -181,21 +196,26 @@ class View(QWidget):
         for btn in all_buttons:
             btn.setChecked(False)
 
+        # 비트라커 버튼도 체크 해제
+        self.bitlocker_button.setChecked(False)
+
         self.toggle_buttons_enabled(True)
         self.start_button.setText("시작")
         self.progress_bar.setValue(0)
         self.text_widget.clear()
 
+        # UI 초기화를 다시 호출하여 상태를 리셋
         self.init_ui()
 
     def toggle_buttons_enabled(self, state):
+        # 비트라커 버튼은 이 함수에서 제어하지 않도록 분리
         all_buttons = list(self.mode_buttons_dict.values()) + list(self.data_buttons_dict.values())
         for btn in all_buttons:
-            if not btn.isChecked():
-                btn.setEnabled(state)
+            # checkable 버튼 그룹은 선택된 버튼이 하나라도 있으면 나머지는 비활성화 되므로
+            # 여기서는 state에 따라 일괄적으로 활성화/비활성화만 제어합니다.
+            btn.setEnabled(state)
 
     def _parse_info_file(self):
-        """info.txt 파일을 파싱하여 self.info_content 딕셔너리에 저장합니다."""
         self.info_content = {}
         info_file_path = r"..\wim\info.txt"
 
@@ -211,9 +231,8 @@ class View(QWidget):
                         current_key = stripped_line[1:-1]
                         content_buffer = []
                     elif current_key:
-                        content_buffer.append(line.strip())  # 불필요한 공백 제거
+                        content_buffer.append(line.strip())
 
-                # 파일의 마지막 섹션 저장
                 if current_key and content_buffer:
                     self.info_content[current_key] = '\n'.join(content_buffer).strip()
 
@@ -223,21 +242,23 @@ class View(QWidget):
             self.info_browser.setText(f"설명 파일 로딩 중 오류 발생:\n{e}")
 
     def update_info(self):
-        """선택된 용도에 따라 설명창의 내용을 업데이트합니다."""
-
         self._parse_info_file()
         selected_mode = None
         for mode, btn in self.mode_buttons_dict.items():
             if btn.isChecked():
                 selected_mode = mode
                 break
+        
+        # "출장용"이 선택되었는지 확인하고 비트라커 버튼 상태 변경
+        is_trip_mode = selected_mode == "출장용"
+        self.bitlocker_button.setEnabled(is_trip_mode)
+        if not is_trip_mode:
+            self.bitlocker_button.setChecked(False)
 
         if selected_mode:
-            # 파싱된 딕셔너리에서 내용 가져오기
             info_text = self.info_content.get(selected_mode, f"'{selected_mode}'에 대한 설명을 찾을 수 없습니다.")
             self.info_browser.setText(info_text)
         else:
-            # 아무것도 선택되지 않았을 때
             self.info_browser.setText("용도 선택은 필수입니다.")
 
     def update_log(self, log_message):

@@ -37,6 +37,7 @@ class Worker(QThread):
         self.stage1 = None
         self.stage2 = None
         self.stage3 = None
+        self.enable_bitlocker = False
 
     def _setup_logger(self):
         log_file = 'log.txt'
@@ -269,7 +270,7 @@ class Worker(QThread):
     def set_unattend(self):
         if self.stage3:    
             source_path = r'..\wim\work.xml'
-            if self.path == 2:
+            if self.enable_bitlocker :
                 source_path = r"..\wim\trip.xml"
             destination_path = r'C:\windows\system32\sysprep\unattend.xml'
             copy_command = f'copy "{source_path}" "{destination_path}"'
