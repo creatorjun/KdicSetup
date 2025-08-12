@@ -310,8 +310,8 @@ class Worker(QThread):
     def check_folders(self, drive_letter):
         path_prefix = f"{drive_letter}:\\"
         sysprep_path = os.path.join(path_prefix, "Windows", "system32", "sysprep")
-        system_ini_path = os.path.join(path_prefix, "Users", "kdic", "desktop", "desktop.ini")
-        is_system_partition = os.path.isdir(sysprep_path) and os.path.isfile(system_ini_path)
+        system_ini_path = os.path.join(path_prefix, "Users", "kdic", "desktop")
+        is_system_partition = os.path.isdir(sysprep_path) and os.path.isdir(system_ini_path)
         data_ini_path = os.path.join(path_prefix, "kdic", "desktop", "desktop.ini")
         is_data_partition = os.path.isfile(data_ini_path)
         return is_system_partition, is_data_partition
