@@ -375,6 +375,7 @@ class Worker(QThread):
             self.log_signal.emit("데이터 보존이 불가능합니다. '데이터 삭제' 옵션을 선택하거나 디스크를 정리하십시오.")
             self.target_volume = None
             self.data_volume = None
+            self.data_signal.emit(False)
         elif len(found_data_partitions) > 1:
             self.log_signal.emit(f"데이터 파티션이 {len(found_data_partitions)}개 발견되었습니다. 하나를 선택해주세요.")
             self.multiple_data_partitions_signal.emit(found_data_partitions)
