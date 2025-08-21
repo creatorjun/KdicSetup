@@ -1,0 +1,11 @@
+# Directories
+__pycache__/
+build/
+venv/
+dist/
+icon/
+
+# Files
+*.ini
+*.txt
+*.spec
