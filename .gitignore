@@ -4,6 +4,7 @@ build/
 venv/
 dist/
 icon/
+Temp/
 
 # Files
 *.ini
