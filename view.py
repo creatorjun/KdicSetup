@@ -1,4 +1,4 @@
-# view.py 전체 코드
+# view.py
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
@@ -34,7 +34,10 @@ class View(QMainWindow):
         self.log_viewer_top = self._create_log_viewer(
             "시스템 분석중입니다. 잠시만 기다려주세요."
         )
-        self.log_viewer_bottom = self._create_log_viewer("타입 선택은 필수사항입니다.")
+        # 초기 안내 문구를 여기서 한 번만 설정하도록 수정
+        self.log_viewer_bottom = self._create_log_viewer(
+            "타입을 선택하면 여기에 설명이 표시됩니다."
+        )
         self.types_group = self._create_types_group()
         bottom_layout = self._create_bottom_layout()
 
@@ -81,7 +84,7 @@ class View(QMainWindow):
     def _create_bottom_layout(self) -> QVBoxLayout:
         bottom_layout = QVBoxLayout()
 
-        self.data_save_button = QPushButton("데이터 저장")
+        self.data_save_button = QPushButton("데이터 보존")
         self.data_save_button.setCheckable(True)
         self.data_save_button.setEnabled(False)
 
@@ -131,24 +134,14 @@ class View(QMainWindow):
         self.set_progress_bar_infinite(is_loading)
 
     def set_ui_for_task_running(self, is_running: bool):
-        """
-        [수정됨] 작업 시작/종료 시 UI 상태를 명확히 구분하여 처리합니다.
-        작업 시작 시에는 버튼의 체크 상태를 건드리지 않습니다.
-        """
-        # 작업이 시작될 때 (is_running = True)
-        if is_running:
-            self.types_group.setEnabled(False)
-            self.data_save_button.setEnabled(False)
-            self.bitlocker_button.setEnabled(False)
-        # 작업이 끝났을 때 (is_running = False)
-        else:
-            self.types_group.setEnabled(True)
-            # 타입 선택에 따라 BitLocker 버튼 상태 업데이트
+        interactive = not is_running
+        self.types_group.setEnabled(interactive)
+        self.data_save_button.setEnabled(interactive)
+        self.bitlocker_button.setEnabled(interactive)
+        if not is_running:
             self._update_bitlocker_button_state()
-            # 데이터 저장 버튼은 다음 실행을 위해 기본 상태(비활성, 언체크)로 리셋
             self.data_save_button.setEnabled(False)
             self.data_save_button.setChecked(False)
-
         self.start_stop_button.setText("중지" if is_running else "시작")
         self.start_stop_button.setChecked(is_running)
 

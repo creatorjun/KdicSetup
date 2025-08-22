@@ -74,9 +74,8 @@ class Controller:
         self._view.set_ui_for_loading(False)  # 로딩 상태 UI 해제
 
         logging.info(f"분석된 시스템 정보: {system_info}")
-        self._view.log_viewer_bottom.setPlaceholderText(
-            "타입을 선택하면 여기에 설명이 표시됩니다."
-        )
+
+        # 설명창의 안내문구를 다시 설정하는 불필요한 코드 삭제
 
         # 데이터 보존이 가능한 환경인지 판단
         is_save_possible = (
@@ -141,7 +140,6 @@ class Controller:
     @log_function_call
     def start_automation(self, options: Options):
         """자동화 작업(Worker) 스레드를 시작하고 타이머를 설정합니다."""
-        # 상단 로그창만 비우고, 하단 설명창은 그대로 둡니다.
         self._view.log_viewer_top.clear()
         self._view.set_ui_for_task_running(True)
 
