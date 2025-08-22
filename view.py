@@ -81,7 +81,7 @@ class View(QMainWindow):
     def _create_bottom_layout(self) -> QVBoxLayout:
         bottom_layout = QVBoxLayout()
 
-        self.data_save_button = QPushButton("데이터 보존")
+        self.data_save_button = QPushButton("데이터 저장")
         self.data_save_button.setCheckable(True)
         self.data_save_button.setEnabled(False)
 
@@ -109,18 +109,15 @@ class View(QMainWindow):
         return bottom_layout
 
     def set_data_save_enabled(self, enabled: bool):
-        # ... (내용 변경 없음)
         self.data_save_button.setEnabled(enabled)
         self.data_save_button.setChecked(enabled)
 
     def _update_bitlocker_button_state(self):
-        # ... (내용 변경 없음)
         is_trip_options = self.types_button_group.checkedId() == 2
         self.bitlocker_button.setEnabled(is_trip_options)
         self.bitlocker_button.setChecked(is_trip_options)
 
     def set_ui_for_loading(self, is_loading: bool):
-        # ... (내용 변경 없음)
         interactive = not is_loading
         self.types_group.setEnabled(interactive)
         self.start_stop_button.setEnabled(interactive)
@@ -134,14 +131,24 @@ class View(QMainWindow):
         self.set_progress_bar_infinite(is_loading)
 
     def set_ui_for_task_running(self, is_running: bool):
-        interactive = not is_running
-        self.types_group.setEnabled(interactive)
-        self.data_save_button.setEnabled(interactive)
-        self.bitlocker_button.setEnabled(interactive)
-        if not is_running:
+        """
+        [수정됨] 작업 시작/종료 시 UI 상태를 명확히 구분하여 처리합니다.
+        작업 시작 시에는 버튼의 체크 상태를 건드리지 않습니다.
+        """
+        # 작업이 시작될 때 (is_running = True)
+        if is_running:
+            self.types_group.setEnabled(False)
+            self.data_save_button.setEnabled(False)
+            self.bitlocker_button.setEnabled(False)
+        # 작업이 끝났을 때 (is_running = False)
+        else:
+            self.types_group.setEnabled(True)
+            # 타입 선택에 따라 BitLocker 버튼 상태 업데이트
             self._update_bitlocker_button_state()
+            # 데이터 저장 버튼은 다음 실행을 위해 기본 상태(비활성, 언체크)로 리셋
             self.data_save_button.setEnabled(False)
             self.data_save_button.setChecked(False)
+
         self.start_stop_button.setText("중지" if is_running else "시작")
         self.start_stop_button.setChecked(is_running)
 

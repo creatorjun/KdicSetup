@@ -4,8 +4,6 @@ import re
 import shutil
 import logging
 
-import wmi
-import pythoncom
 from PyQt6.QtCore import QThread, pyqtSignal
 
 import utils
@@ -43,8 +41,10 @@ class Worker(QThread):
             }
             pc_type_str = type_map.get(self._options.type, "알 수 없음")
             save_str = "보존" if self._options.save else "삭제"
-            
-            start_message = f"데이터를 {save_str}하고 '{pc_type_str}'(으)로 초기화합니다."
+
+            start_message = (
+                f"데이터를 {save_str}하고 '{pc_type_str}'(으)로 초기화합니다."
+            )
             self.log_updated.emit(start_message)
 
             self._setup_letters()
@@ -58,7 +58,7 @@ class Worker(QThread):
             )
             self.current_progress += apply_task_weight
 
-            driver_path = self._get_driver_path()
+            driver_path = self._system_info.driver_path
 
             driver_task_weight = 10
             self._install_drivers_with_dism(
@@ -165,12 +165,9 @@ class Worker(QThread):
                 "format fs=fat32 quick",
             ]
         else:
-            # --- 클린 설치 로직 수정 ---
-            # 조건: 데이터 디스크가 없거나, 시스템 디스크와 데이터 디스크가 동일한 경우
             if info.data_disk_index == -1 or (
                 info.system_disk_index == info.data_disk_index
             ):
-                # 디스크가 1개인 시나리오
                 if info.system_disk_index == -1:
                     raise RuntimeError(
                         "포맷 실패: 클린 설치에 필요한 시스템 디스크를 찾지 못했습니다."
@@ -190,9 +187,7 @@ class Worker(QThread):
                     "format fs=ntfs label=DATA quick",
                     "assign letter=D",
                 ]
-            # 조건: 시스템 디스크와 데이터 디스크가 서로 다른 경우
             elif info.system_disk_index != -1 and info.data_disk_index != -1:
-                # 디스크가 2개이상인 시나리오
                 script_lines = [
                     f"select disk {info.system_disk_index}",
                     "clean",
@@ -282,8 +277,12 @@ class Worker(QThread):
         self.progress_updated.emit(start_progress + task_weight)
 
     def _restore(self):
+        """
+        사용자 폴더, 드라이버, 시작 메뉴 레이아웃 등 기타 설정 파일들을 복원합니다.
+        '데이터 보존' 옵션에 따라 스티커 메모 복원 여부가 결정됩니다.
+        """
         temp_path = os.path.join(os.getcwd(), "Temp")
-        driver_source_path = self._get_driver_path()
+        driver_source_path = self._system_info.driver_path
         start_menu_source_file = os.path.join(temp_path, "work", "start2.bin")
         if self._options.type not in [0, 3, 4]:
             start_menu_source_file = os.path.join(temp_path, "internet", "start2.bin")
@@ -292,28 +291,38 @@ class Worker(QThread):
             "wim",
             "unattend_trip.xml" if self._options.bitlocker else "unattend_normal.xml",
         )
-        restore_jobs = [
-            {
-                "name": "사용자 프로필 폴더(D 드라이브) 복사",
-                "source": r"C:\Users\kdic",
-                "dest": r"D:\kdic",
-                "type": "folder",
-                "progress": 1,
-            },
+
+        # 복원할 작업 목록 정의
+        restore_jobs = []
+
+        # 사용자 폴더 복사 작업은 항상 수행
+        user_folders_to_copy = [
+            "Desktop",
+            "Downloads",
+            "Documents",
+            "Pictures",
+            "Music",
+            "Videos",
+        ]
+        for folder in user_folders_to_copy:
+            restore_jobs.append(
+                {
+                    "name": f"사용자 폴더({folder}) 복사",
+                    "source": rf"C:\Users\kdic\{folder}",
+                    "dest": rf"D:\kdic\{folder}",
+                    "type": "folder",
+                    "progress": 1,
+                }
+            )
+
+        # 모든 경우에 공통적으로 수행할 복원 작업 추가
+        common_jobs = [
             {
                 "name": "드라이버 파일(C 드라이브) 복사",
                 "source": driver_source_path,
                 "dest": r"C:\SEPR\Drivers",
                 "type": "folder",
                 "progress": 1,
-            },
-            {
-                "name": "스티커 메모 데이터 복원",
-                "source": os.path.join(temp_path, "StickyNotes"),
-                "dest": r"C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState",
-                "type": "folder",
-                "progress": 1,
-                "delete_source": True,
             },
             {
                 "name": "시작 메뉴 레이아웃 복원",
@@ -330,42 +339,54 @@ class Worker(QThread):
                 "progress": 3,
             },
         ]
-        if not self._options.save:
-            restore_jobs = [
-                job
-                for job in restore_jobs
-                if job["name"] != "스티커 메모 데이터 복원"
-            ]
+        restore_jobs.extend(common_jobs)
 
+        # '데이터 보존' 옵션이 선택된 경우에만 스티커 메모 복원 작업을 추가
+        if self._options.save:
+            restore_jobs.append(
+                {
+                    "name": "스티커 메모 데이터 복원",
+                    "source": os.path.join(temp_path, "StickyNotes"),
+                    "dest": r"C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState",
+                    "type": "folder",
+                    "progress": 1,
+                    "delete_source": True,
+                }
+            )
+
+        # 정의된 작업 목록을 순차적으로 실행
         for job in restore_jobs:
             self._check_stop()
             source_path = job["source"]
-            if not (
-                os.path.isdir(source_path)
-                if job["type"] in ["folder", "file"]
-                else os.path.isfile(source_path)
-            ):
+
+            # 원본 경로가 존재하지 않으면 경고 로그를 남기고 작업을 건너뜀
+            if not os.path.exists(source_path):
                 logging.warning(
                     f"경고: 원본 '{source_path}'가 없어 '{job['name']}' 작업을 건너뜁니다."
                 )
                 self._update_progress(job["progress"])
                 continue
 
+            # 파일 또는 폴더 복사 실행
             if job["type"] == "file-rename":
                 shutil.copy(source_path, job["dest"])
             else:
-                source_dir, dest_dir, filename = (
-                    (
-                        os.path.dirname(source_path),
-                        job["dest"],
-                        os.path.basename(source_path),
-                    )
-                    if job["type"] == "file"
-                    else (source_path, job["dest"], None)
+                source_dir = source_path
+                dest_dir = job["dest"]
+                filename = None
+                if job["type"] == "file":
+                    source_dir = os.path.dirname(source_path)
+                    filename = os.path.basename(source_path)
+
+                # Robocopy 명령어에 재시도 옵션(/R:1, /W:1)을 명시적으로 포함
+                cmd = (
+                    f'robocopy "{source_dir}" "{dest_dir}"'
+                    f"{' ' + filename if filename else ''}"
+                    " /E /COPYALL /B /R:1 /W:1 /J /MT:16 /NP /NJS /NJH"
                 )
-                cmd = f'robocopy "{source_dir}" "{dest_dir}"{" " + filename if filename else ""} /E /COPYALL /B /R:1 /W:1 /J /MT:16 /NP /NJS /NJH'
                 self._execute_command(cmd, job["name"])
 
+            # 작업 완료 후 임시 원본 삭제 옵션이 있으면 삭제
             if job.get("delete_source", False):
                 try:
                     shutil.rmtree(source_path)
@@ -382,38 +403,8 @@ class Worker(QThread):
 
         # 2. bcdedit로 {default} 부팅 항목이 C 드라이브를 가리키도록 명시적으로 설정
         bcdedit_commands = [
-            r'bcdedit /set {default} device partition=C:',
-            r'bcdedit /set {default} osdevice partition=C:'
+            r"bcdedit /set {default} device partition=C:",
+            r"bcdedit /set {default} osdevice partition=C:",
         ]
         for command in bcdedit_commands:
             self._execute_command(command, "기본 부팅 파티션 설정")
-
-    def _get_driver_path(self) -> str:
-        board_product_name = ""
-        try:
-            pythoncom.CoInitialize()
-            c = wmi.WMI()
-            for board in c.Win32_BaseBoard():
-                board_product_name = board.Product
-        finally:
-            pythoncom.CoUninitialize()
-        if not board_product_name:
-            raise RuntimeError("WMI를 통해 메인보드 모델명을 가져올 수 없습니다.")
-        clean_name = re.sub(r'[\\/:*?"<>|]', "", board_product_name).strip()
-        drivers_base_path = os.path.join(os.path.dirname(os.getcwd()), "Drivers")
-        driver_path = self._find_path_by_prefix(drivers_base_path, clean_name)
-        if not driver_path:
-            raise FileNotFoundError(
-                f"'{drivers_base_path}' 안에서 '{clean_name}'(으)로 시작하는 드라이버 폴더를 찾을 수 없습니다."
-            )
-        return driver_path
-
-    def _find_path_by_prefix(self, base_path: str, prefix: str) -> str:
-        if not os.path.isdir(base_path):
-            return ""
-        for item in os.listdir(base_path):
-            if item.lower().startswith(prefix.lower()):
-                full_path = os.path.join(base_path, item)
-                if os.path.isdir(full_path):
-                    return full_path
-        return ""
