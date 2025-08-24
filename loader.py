@@ -139,7 +139,7 @@ class Loader(QThread):
                 # Data 볼륨 조건: kdic/desktop, kdic/downloads 폴더 존재
                 data_paths = {
                     "kdic_desktop": os.path.join(root, "kdic", "desktop"),
-                    "kdic_appdata": os.path.join(root, "kdic", "download"),
+                    "kdic_appdata": os.path.join(root, "kdic", "downloads"),
                 }
                 if all(os.path.isdir(p) for p in data_paths.values()):
                     data_candidates.append(volume)
