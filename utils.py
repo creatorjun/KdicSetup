@@ -24,6 +24,7 @@ def run_command(command: List[str]) -> Generator[Tuple[str, str], None, None]:
             encoding="cp949",
             shell=False,  # shell=True를 False로 변경
             bufsize=1,
+            creationflags=subprocess.CREATE_NO_WINDOW,  # 콘솔 창 숨김
         )
 
         for line in iter(process.stdout.readline, ""):
@@ -39,7 +40,6 @@ def run_command(command: List[str]) -> Generator[Tuple[str, str], None, None]:
         yield "return_code", str(return_code)
 
     except FileNotFoundError:
-        # command가 리스트이므로 첫 번째 요소를 표시
         yield "stderr", f"명령어를 찾을 수 없습니다: {command[0]}"
         yield "return_code", "-1"
     except Exception as e:
@@ -60,6 +60,7 @@ def run_diskpart_script(script_content: str) -> Tuple[bool, str]:
             encoding="cp949",
             shell=False,  # shell=True를 False로 변경
             check=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,  # 콘솔 창 숨김
         )
         return True, result.stdout
     except FileNotFoundError:
@@ -72,11 +73,44 @@ def run_diskpart_script(script_content: str) -> Tuple[bool, str]:
 
 # ==============================================================================
 # Parser Utilities
-# (이하 내용은 변경 없음)
 # ==============================================================================
 
 
-# ... (기존 Parser 클래스 코드는 그대로 유지) ...
+def parse_list_disk(output: str) -> Tuple[List[str], Dict[str, str]]:
+    """
+    'list disk' 명령어의 출력 텍스트를 파싱합니다.
+    """
+    indices = []
+    sizes = {}
+    lines = output.splitlines()
+    header_found = False
+
+    for line in lines:
+        if "---" in line:
+            header_found = True
+            continue
+        if not header_found or not line.strip():
+            continue
+
+        parts = line.split()
+        if len(parts) >= 4 and parts[0].lower() == "디스크":
+            disk_index = parts[1]
+
+            size = ""
+            unit = ""
+            for i in range(len(parts) - 1, 2, -1):
+                if parts[i].upper() in ("GB", "MB", "TB", "KB", "B"):
+                    unit = parts[i]
+                    size = parts[i - 1]
+                    break
+
+            if size and unit:
+                indices.append(disk_index)
+                sizes[disk_index] = f"{size} {unit}"
+
+    return indices, sizes
+
+
 class Parser:
     """diskpart의 'detail disk' 결과 텍스트를 파싱하는 클래스"""
 
@@ -205,8 +239,11 @@ def reboot_system():
     """시스템을 즉시 재부팅합니다."""
     try:
         subprocess.run(
-            ["shutdown", "/r", "/t", "0"], check=True, shell=False
-        )  # shell=True를 False로 변경
+            ["shutdown", "/r", "/t", "0"],
+            check=True,
+            shell=False,  # shell=True를 False로 변경
+            creationflags=subprocess.CREATE_NO_WINDOW,  # 콘솔 창 숨김
+        )
         return True, "시스템 재부팅 명령을 전송했습니다."
     except Exception as e:
         return False, f"재부팅 중 오류 발생: {e}"
