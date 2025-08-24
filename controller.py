@@ -1,10 +1,12 @@
 # controller.py
 
-import logging
 import re
 import os
 import time
+import sys
+import logging
 from PyQt6.QtCore import QTimer
+
 from view import View
 from models import Options, SystemInfo
 from loader import Loader
@@ -16,7 +18,7 @@ from worker import Worker
 
 class Controller:
     """
-    애플리ケーション의 메인 로직을 담당하는 클래스.
+    애플리케이션의 메인 로직을 담당하는 클래스.
     View(UI)와 Worker/Loader(백그라운드 작업) 사이의 상호작용을 제어합니다.
     """
 
@@ -39,7 +41,17 @@ class Controller:
         descriptions = {}
         key_map = {"내부망": 0, "인터넷": 1, "출장용": 2, "K자회사": 3}
         try:
-            info_file_path = os.path.join(os.getcwd(), "info.txt")
+            # --- [변경] 실행 파일의 위치를 기준으로 경로 설정 ---
+            if getattr(sys, 'frozen', False):
+                # PyInstaller로 빌드된 .exe 파일에서 실행될 때
+                base_path = os.path.dirname(sys.executable)
+            else:
+                # 일반 .py 스크립트로 실행될 때
+                base_path = os.path.dirname(os.path.abspath(__file__))
+            
+            info_file_path = os.path.join(base_path, "info.txt")
+            # ----------------------------------------------
+            
             if not os.path.exists(info_file_path):
                 return {}
             with open(info_file_path, "r", encoding="utf-8") as f:
