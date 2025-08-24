@@ -136,13 +136,16 @@ class Loader(QThread):
                 if all(os.path.isdir(p) for p in sys_paths.values()):
                     system_candidates.append(volume)
 
-                # Data 볼륨 조건: kdic/desktop, kdic/downloads 폴더 존재
-                data_paths = {
-                    "kdic_desktop": os.path.join(root, "kdic", "desktop"),
-                    "kdic_appdata": os.path.join(root, "kdic", "downloads"),
-                }
-                if all(os.path.isdir(p) for p in data_paths.values()):
+                # --- [수정된 부분 시작] ---
+                # Data 볼륨 조건: kdic/desktop, kdic/downloads 폴더가 모두 존재해야 함
+                kdic_desktop_path = os.path.join(root, "kdic", "desktop")
+                kdic_downloads_path = os.path.join(root, "kdic", "downloads")
+
+                if os.path.isdir(kdic_desktop_path) and os.path.isdir(
+                    kdic_downloads_path
+                ):
                     data_candidates.append(volume)
+                # --- [수정된 부분 끝] ---
 
         for vol in system_candidates:
             vol.volume_type = "System"

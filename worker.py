@@ -1,11 +1,10 @@
 # worker.py
 
-# -*- coding: utf-8 -*-
 import os
 import re
 import shutil
 import logging
-from typing import List  # [수정] List 타입 힌트를 사용하기 위해 추가
+from typing import List
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -239,7 +238,7 @@ class Worker(QThread):
 
         command = [
             "DISM.exe",
-            "/Apply-Image",  # [수정] 불필요한 f-string 제거
+            "/Apply-Image",
             f"/ImageFile:{wim_file_path}",
             "/Index:1",
             "/ApplyDir:C:\\",
