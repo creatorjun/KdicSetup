@@ -40,17 +40,14 @@ class Controller:
         """info.txt 파일에서 각 PC 타입에 대한 설명을 읽어와 딕셔너리로 반환합니다."""
         descriptions = {}
         key_map = {"내부망": 0, "인터넷": 1, "출장용": 2, "K자회사": 3}
+
         try:
-            # --- [변경] 실행 파일의 위치를 기준으로 경로 설정 ---
             if getattr(sys, 'frozen', False):
-                # PyInstaller로 빌드된 .exe 파일에서 실행될 때
                 base_path = os.path.dirname(sys.executable)
             else:
-                # 일반 .py 스크립트로 실행될 때
                 base_path = os.path.dirname(os.path.abspath(__file__))
             
             info_file_path = os.path.join(base_path, "info.txt")
-            # ----------------------------------------------
             
             if not os.path.exists(info_file_path):
                 return {}
@@ -153,6 +150,7 @@ class Controller:
     def start_automation(self, options: Options):
         """자동화 작업(Worker) 스레드를 시작하고 타이머를 설정합니다."""
         self._view.log_viewer_top.clear()
+        self._on_type_selected(self._view.types_button_group.checkedId())
         self._view.set_ui_for_task_running(True)
 
         # 1. Loader가 읽어온 예상 시간이 있으면 그 값을 사용
