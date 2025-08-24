@@ -141,6 +141,7 @@ class Loader(QThread):
                 kdic_desktop_path = os.path.join(root, "kdic", "desktop")
                 kdic_downloads_path = os.path.join(root, "kdic", "downloads")
 
+                # 'and' 연산자를 사용하여 두 폴더가 모두 존재하는지 확인합니다.
                 if os.path.isdir(kdic_desktop_path) and os.path.isdir(
                     kdic_downloads_path
                 ):
