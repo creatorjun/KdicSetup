@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KdicSetup - GUI PC 초기화 자동화 프로그램</title>
+    <title>KdicSetup V. 2.0</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -195,7 +195,6 @@
                 <li><strong>Model (models.py):</strong> <code>Options</code>, <code>SystemInfo</code> 등 프로그램에서 사용하는 데이터 구조를 정의합니다.</li>
                 <li><strong>Background Threads (loader.py, worker.py):</strong> 시스템 분석 및 PC 초기화처럼 시간이 오래 걸리는 작업을 별도의 스레드에서 처리하여 UI 멈춤 현상을 방지합니다.</li>
             </ul>
-            <img src="https://i.imgur.com/k9b3B0G.png" alt="Architecture Diagram" class="center-image" width="700">
         </section>
 
         <section id="structure">
