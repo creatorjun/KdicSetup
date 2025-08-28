@@ -330,21 +330,28 @@ class Loader(QThread):
             [v for d in disks for v in d.volumes if v.volume_type == "System"]
         )
 
-        # ** 클린 설치 환경 처리 **
-        # 시스템 볼륨을 찾지 못한 경우(예: 새 디스크), 디스크 타입과 용량을 기준으로 시스템 디스크를 결정합니다.
-        if info.system_disk_index == -1:
-            # 우선순위(NVMe > SSD > SATA)와 용량(작은 순)에 따라 디스크를 정렬합니다.
-            sorted_disks = sorted(
-                disks, key=lambda d: (self._get_disk_priority(d), d.size_gb)
-            )
+        # ** 디스크 구성 최종 결정 **
+        # 우선순위(NVMe > SSD > SATA)와 용량(작은 순)에 따라 디스크를 정렬합니다.
+        sorted_disks = sorted(
+            disks, key=lambda d: (self._get_disk_priority(d), d.size_gb)
+        )
 
-        if sorted_disks:
-            # 가장 우선순위가 높은 디스크를 시스템 디스크로 지정합니다.
+        # 1. 시스템 디스크 결정:
+        # 만약 볼륨 분석으로 시스템 디스크를 찾지 못했다면 (클린 디스크),
+        # 정렬된 디스크 목록의 첫 번째 디스크를 시스템 디스크로 지정합니다.
+        if info.system_disk_index == -1 and sorted_disks:
             info.system_disk_index = sorted_disks[0].index
             info.system_disk_type = sorted_disks[0].type
-            # 디스크가 2개 이상이고 데이터 디스크가 아직 정해지지 않았다면, 두 번째 디스크를 데이터 디스크로 지정합니다.
-            if len(sorted_disks) > 1 and info.data_disk_index == -1:
-                info.data_disk_index = sorted_disks[1].index
+
+        # 2. 데이터 디스크 결정:
+        # 만약 볼륨 분석으로 데이터 디스크를 찾지 못했고, 디스크가 2개 이상이라면,
+        # 시스템 디스크가 아닌 다른 디스크를 데이터 디스크로 지정합니다.
+        if info.data_disk_index == -1 and len(sorted_disks) > 1:
+            # 시스템 디스크로 지정된 디스크를 제외한 첫 번째 디스크를 데이터 디스크 후보로 선택합니다.
+            for disk in sorted_disks:
+                if disk.index != info.system_disk_index:
+                    info.data_disk_index = disk.index
+                    break  # 데이터 디스크를 찾았으므로 루프 종료
 
         return info
 
