@@ -338,13 +338,13 @@ class Loader(QThread):
                 disks, key=lambda d: (self._get_disk_priority(d), d.size_gb)
             )
 
-            if sorted_disks:
-                # 가장 우선순위가 높은 디스크를 시스템 디스크로 지정합니다.
-                info.system_disk_index = sorted_disks[0].index
-                info.system_disk_type = sorted_disks[0].type
-                # 디스크가 2개 이상이고 데이터 디스크가 아직 정해지지 않았다면, 두 번째 디스크를 데이터 디스크로 지정합니다.
-                if len(sorted_disks) > 1 and info.data_disk_index == -1:
-                    info.data_disk_index = sorted_disks[1].index
+        if sorted_disks:
+            # 가장 우선순위가 높은 디스크를 시스템 디스크로 지정합니다.
+            info.system_disk_index = sorted_disks[0].index
+            info.system_disk_type = sorted_disks[0].type
+            # 디스크가 2개 이상이고 데이터 디스크가 아직 정해지지 않았다면, 두 번째 디스크를 데이터 디스크로 지정합니다.
+            if len(sorted_disks) > 1 and info.data_disk_index == -1:
+                info.data_disk_index = sorted_disks[1].index
 
         return info
 
