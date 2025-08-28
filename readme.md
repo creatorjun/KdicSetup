@@ -66,3 +66,62 @@ KdicSetup은 Windows PC의 포맷, 운영체제 설치, 드라이버 및 기본 
 * **Background Threads (loader.py, worker.py):** 시스템 분석 및 PC 초기화처럼 시간이 오래 걸리는 작업을 별도의 스레드에서 처리하여 UI 멈춤 현상을 방지합니다.
 
 ## 5. 프로젝트 구조
+
+KdicSetup/
+├── KdicSetup.py         # 메인 실행 파일 (Entry Point)
+├── view.py              # UI 로직
+├── controller.py        # 메인 제어 로직
+├── loader.py            # 시스템 분석 스레드
+├── worker.py            # 실제 작업 수행 스레드
+├── models.py            # 데이터 모델 (dataclasses)
+├── utils.py             # 유틸리티 함수 (명령어 실행 등)
+├── dialog.py            # 사용자 확인 대화상자
+├── logger.py            # 로깅 시스템 설정
+└── .gitignore           # Git 버전 관리 제외 목록
+
+
+## 6. 핵심 컴포넌트 상세
+<details>
+    <summary><b>Loader.py - 시스템 분석기</b></summary>
+    <ul>
+        <li><code>diskpart</code> 명령으로 디스크 및 볼륨 정보를 수집합니다.</li>
+        <li>USB 디스크를 제외하고, 폴더 구조를 기반으로 System, Data, Boot 볼륨을 자동으로 분류합니다.</li>
+        <li>WMI를 통해 메인보드 모델명을 조회하고, <code>../Drivers/</code> 에서 일치하는 드라이버 폴더 경로를 찾습니다.</li>
+        <li>분석된 모든 정보를 <code>SystemInfo</code> 객체에 담아 Controller로 전달합니다.</li>
+    </ul>
+</details>
+<details>
+    <summary><b>Worker.py - 자동화 작업자</b></summary>
+    <ul>
+        <li>사용자 옵션에 따라 <code>diskpart</code> 스크립트를 동적으로 생성하여 디스크 포맷 및 파티션 생성을 수행합니다.</li>
+        <li><code>DISM</code> 명령으로 선택된 WIM 이미지를 OS 파티션에 적용하고, 드라이버를 통합 설치합니다.</li>
+        <li><code>robocopy</code>를 이용해 사용자 폴더 등 기타 설정 파일들을 복원합니다.</li>
+        <li><code>bcdboot</code>, <code>bcdedit</code> 명령으로 UEFI 부팅 정보를 구성합니다.</li>
+    </ul>
+</details>
+<details>
+    <summary><b>Controller.py - 중앙 통제 장치</b></summary>
+    <ul>
+        <li>View로부터의 사용자 입력(시그널)을 받아 Loader나 Worker 스레드를 시작/중지시킵니다.</li>
+        <li>Loader와 Worker로부터 진행률, 로그, 완료/오류 상태를 받아 View에 업데이트합니다.</li>
+        <li>작업 완료 후 실제 소요 시간을 파일에 저장하여 다음 실행 시 '예상 남은 시간'의 정확도를 높입니다.</li>
+    </ul>
+</details>
+
+## 7. 유지보수 가이드
+### 7.1. WIM 이미지 관리
+* **경로:** `../wim/`
+* PC 타입 추가 또는 이미지 업데이트 시, 해당 폴더에 `.wim` 파일을 추가/교체하세요.
+* **코드 수정:** 새 타입을 추가하는 경우, `worker.py`의 `wim_map`과 `view.py`의 `buttons` 딕셔너리를 수정해야 합니다.
+
+### 7.2. 드라이버 관리
+* **경로:** `../Drivers/`
+* 새 PC 모델의 드라이버를 추가하려면, `[메인보드 모델명]`으로 시작하는 폴더를 생성하고 내부에 드라이버 파일을 위치시키세요.
+* **참고:** 모델명은 WMI 조회 결과와 일치해야 정확히 인식됩니다.
+
+### 7.3. 디버깅
+* 프로그램 실행 시 생성되는 `log.txt` 파일을 확인하면 모든 작업의 상세 과정과 오류 내역을 파악할 수 있습니다.
+
+### 7.4. 설정 변경
+* **데이터 삭제 확인 암호:** `dialog.py`의 `ConfirmationDialog` 클래스 내 `_validate_input` 메소드에서 변경할 수 있습니다.
+* **기본 예상 시간:** `controller.py`의 `start_automation` 메소드에서 디스크 타입별(NVMe, SSD, HDD) 기본 예상 시간을 조정할 수 있습니다.
