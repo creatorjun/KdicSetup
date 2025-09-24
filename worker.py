@@ -74,7 +74,7 @@ class Worker(QThread):
                 1: "인터넷용",
                 2: "출장용",
                 3: "K자회사",
-                4: "업무용",  # ID 4는 예비 또는 호환성을 위해 추가되었을 수 있음
+                4: "업무용",  # ID 4는 예비 또는 호환성을 위해 추가되었음
             }
             pc_type_str = type_map.get(self._options.type, "알 수 없음")
             save_str = "보존" if self._options.save else "삭제"
@@ -409,21 +409,12 @@ class Worker(QThread):
         temp_path = os.path.join(os.getcwd(), "Temp")
         # Loader가 찾은 현재 PC 모델에 맞는 드라이버 폴더 경로
         driver_source_path = self._system_info.driver_path
-        # PC 타입에 따라 다른 시작 메뉴 레이아웃 파일(.bin) 경로를 설정합니다.
-        start_menu_source_file = os.path.join(temp_path, "work", "start2.bin")
-        if self._options.type not in [
-            0,
-            3,
-            4,
-        ]:  # 업무용, K자회사가 아닌 경우 (인터넷, 출장용)
-            start_menu_source_file = os.path.join(temp_path, "internet", "start2.bin")
         # BitLocker 설정 여부에 따라 다른 무인 설치 응답 파일(unattend.xml) 경로를 설정합니다.
         unattend_source_path = os.path.join(
             os.path.dirname(os.getcwd()),
             "wim",
             "unattend_trip.xml" if self._options.bitlocker else "unattend_normal.xml",
         )
-
         restore_jobs = []
         # '데이터 보존' 시 C:\Users\kdic\ 에 있던 사용자 폴더들을 D:\kdic\ 로 복사합니다.
         user_folders_to_copy = [
@@ -455,13 +446,6 @@ class Worker(QThread):
                 "progress": 0,
             },
             {
-                "name": "시작 메뉴 레이아웃 복원",
-                "source": start_menu_source_file,
-                "dest": r"C:\Users\kdic\AppData\Local\Packages\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\LocalState",
-                "type": "file",
-                "progress": 1,
-            },
-            {
                 "name": "Unattend.xml 파일 복사",
                 "source": unattend_source_path,
                 "dest": r"C:\Windows\system32\sysprep\unattend.xml",
@@ -479,7 +463,7 @@ class Worker(QThread):
                     "source": os.path.join(temp_path, "StickyNotes"),
                     "dest": r"C:\Users\kdic\AppData\Local\Packages\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe\LocalState",
                     "type": "folder",
-                    "progress": 1,
+                    "progress": 2,
                     "delete_source": True,  # 복원 후 임시 폴더 삭제
                 }
             )
