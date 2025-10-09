@@ -50,6 +50,15 @@ class Loader(QThread):
             detail_output = self._get_detailed_disk_info(disk_indices)
             # 3. diskpart의 텍스트 출력을 파싱하여 DiskInfo 객체 리스트로 변환합니다.
             parsed_disks = self._parse_disk_details(detail_output, disk_sizes)
+
+            # --- [수정 1] 디스크 전체 크기 보정 로직 ---
+            # detail disk의 볼륨 크기 합산으로 부정확한 list disk 크기 정보를 덮어씁니다.
+            for disk in parsed_disks:
+                if disk.size_gb == 0.0 and disk.volumes:
+                    total_volume_size = sum(v.size_gb for v in disk.volumes)
+                    if total_volume_size > 0:
+                        disk.size_gb = round(total_volume_size, 2)
+
             # 4. 드라이브 문자가 없는 볼륨에 임시 드라이브 문자를 할당하여 내용에 접근할 수 있도록 합니다.
             disks_with_letters = self._assign_drive_letters(parsed_disks)
             # 5. 분석 대상에서 USB 디스크를 제외합니다.
@@ -297,7 +306,6 @@ class Loader(QThread):
         info.driver_path = driver_path
         info.estimated_time_sec = estimated_time
 
-        # 분류된 볼륨들을 찾습니다.
         system_volume = next(
             (v for d in disks for v in d.volumes if v.volume_type == "System"), None
         )
@@ -308,7 +316,7 @@ class Loader(QThread):
             (v for d in disks for v in d.volumes if v.volume_type == "Boot"), None
         )
 
-        # 각 볼륨이 존재하면, 해당 볼륨 및 디스크의 인덱스 정보를 SystemInfo 객체에 저장합니다.
+        # 기존 볼륨 정보를 일단 저장해 둡니다. (주로 '데이터 보존' 시 참고용)
         if system_volume:
             system_disk = next((d for d in disks if system_volume in d.volumes), None)
             if system_disk:
@@ -325,33 +333,31 @@ class Loader(QThread):
         if boot_volume:
             info.boot_volume_index = boot_volume.index
 
-        # 발견된 시스템 볼륨의 총 개수를 저장합니다.
         info.system_volume_count = len(
             [v for d in disks for v in d.volumes if v.volume_type == "System"]
         )
-
-        # ** 디스크 구성 최종 결정 **
+        
+        # --- [수정 2] 디스크 구성 최종 결정 로직 강화 ---
         # 우선순위(NVMe > SSD > SATA)와 용량(작은 순)에 따라 디스크를 정렬합니다.
         sorted_disks = sorted(
             disks, key=lambda d: (self._get_disk_priority(d), d.size_gb)
         )
 
         # 1. 시스템 디스크 결정:
-        # 만약 볼륨 분석으로 시스템 디스크를 찾지 못했다면 (클린 디스크),
-        # 정렬된 디스크 목록의 첫 번째 디스크를 시스템 디스크로 지정합니다.
-        if info.system_disk_index == -1 and sorted_disks:
+        # 정렬된 디스크 목록의 첫 번째 디스크를 항상 시스템 디스크로 지정합니다.
+        # 이렇게 하면 '클린 설치' 시 SSD가 항상 HDD보다 우선적으로 선택됩니다.
+        if sorted_disks:
             info.system_disk_index = sorted_disks[0].index
             info.system_disk_type = sorted_disks[0].type
 
         # 2. 데이터 디스크 결정:
-        # 만약 볼륨 분석으로 데이터 디스크를 찾지 못했고, 디스크가 2개 이상이라면,
         # 시스템 디스크가 아닌 다른 디스크를 데이터 디스크로 지정합니다.
-        if info.data_disk_index == -1 and len(sorted_disks) > 1:
-            # 시스템 디스크로 지정된 디스크를 제외한 첫 번째 디스크를 데이터 디스크 후보로 선택합니다.
-            for disk in sorted_disks:
-                if disk.index != info.system_disk_index:
-                    info.data_disk_index = disk.index
-                    break  # 데이터 디스크를 찾았으므로 루프 종료
+        if len(sorted_disks) > 1:
+            # 시스템 디스크로 지정된 디스크를 제외한 첫 번째 디스크를 찾습니다.
+            data_disk_candidate = next((d for d in sorted_disks if d.index != info.system_disk_index), None)
+            if data_disk_candidate:
+                 info.data_disk_index = data_disk_candidate.index
+
 
         return info
 
