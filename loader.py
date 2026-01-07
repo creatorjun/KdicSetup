@@ -6,14 +6,7 @@ import os
 # re 모듈: 정규 표현식을 사용하여 문자열에서 특정 패턴을 찾거나 수정하는 데 사용됩니다.
 import re
 
-# wmi 모듈: Windows Management Instrumentation(WMI)에 접근하기 위한 라이브러리입니다.
-# 시스템 하드웨어 정보(예: 메인보드 모델명)를 조회하기 위해 사용됩니다.
-import wmi
-
-# pythoncom 모듈: 파이썬에서 COM(Component Object Model) 객체를 사용하기 위해 필요합니다.
-# wmi 모듈이 내부적으로 COM을 사용하므로, 스레드 환경에서 안전하게 사용하려면 초기화/해제가 필요합니다.
-import pythoncom
-
+import winreg
 # typing 모듈: 타입 힌트를 제공하여 코드의 가독성과 유지보수성을 향상시킵니다.
 from typing import List, Dict, Tuple
 
@@ -214,22 +207,37 @@ class Loader(QThread):
 
     def _get_driver_path(self) -> str:
         """
-        WMI를 사용하여 메인보드 모델명을 조회하고, 일치하는 드라이버 폴더 경로를 반환합니다.
+        레지스트리를 사용하여 메인보드 모델명을 조회하고, 일치하는 드라이버 폴더 경로를 반환합니다.
+        (WMI 의존성 제거됨)
         """
         board_product_name = ""
+        
+        # 레지스트리 경로: HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\BIOS
+        key_path = r"HARDWARE\DESCRIPTION\System\BIOS"
+
         try:
-            pythoncom.CoInitialize()
-            c = wmi.WMI()
-            for board in c.Win32_BaseBoard():
-                board_product_name = board.Product
-        finally:
-            pythoncom.CoUninitialize()
+            # winreg를 사용하여 레지스트리 키를 엽니다.
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as key:
+                # 'BaseBoardProduct' 값을 읽어옵니다. (대부분의 메인보드 모델명)
+                try:
+                    board_product_name, _ = winreg.QueryValueEx(key, "BaseBoardProduct")
+                except FileNotFoundError:
+                    # BaseBoardProduct가 없는 경우 'SystemProductName'을 시도합니다.
+                    board_product_name, _ = winreg.QueryValueEx(key, "SystemProductName")
+        except Exception:
+            # 레지스트리 접근 실패 혹은 키를 찾을 수 없는 경우 무시하고 빈 문자열 유지
+            pass
 
         if not board_product_name:
-            raise RuntimeError("WMI를 통해 메인보드 모델명을 가져올 수 없습니다.")
+            raise RuntimeError("레지스트리를 통해 메인보드 모델명을 가져올 수 없습니다.")
 
+        # 모델명에서 특수문자를 제거하고 공백을 정리합니다.
         clean_name = re.sub(r'[\\/:*?"<>|]', "", board_product_name).strip()
+        
+        # 드라이버 폴더 경로 설정 (현재 작업 디렉토리의 상위 폴더 -> Drivers)
         drivers_base_path = os.path.join(os.path.dirname(os.getcwd()), "Drivers")
+        
+        # 정리된 모델명으로 시작하는 폴더를 찾습니다.
         driver_path = self._find_path_by_prefix(drivers_base_path, clean_name)
 
         if not driver_path:

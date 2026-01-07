@@ -245,8 +245,6 @@ class Worker(QThread):
             script_lines = [
                 "select volume c",
                 "format fs=ntfs label=OS quick",
-                "select volume z",
-                "format fs=fat32 quick",
             ]
         else:  # '클린 설치' 옵션
             # 시스템 디스크와 데이터 디스크가 동일한 경우 (디스크 1개)
@@ -541,7 +539,8 @@ class Worker(QThread):
         # /s z: : 부팅 파일을 저장할 시스템 파티션을 지정합니다.
         # /f UEFI: UEFI 펌웨어용 부팅 파일을 생성하도록 지정합니다.
         bcdboot_command = ["bcdboot", r"C:\Windows", "/s", "z:", "/f", "UEFI"]
-        self._execute_command(bcdboot_command, "부트 파일 생성")
+        if not self._options.save:
+            self._execute_command(bcdboot_command, "부트 파일 생성")
 
         # bcdedit: 부팅 구성 데이터(BCD)를 편집합니다.
         # {default}는 기본 부팅 항목을 의미합니다.
