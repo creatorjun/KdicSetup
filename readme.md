@@ -125,3 +125,5 @@ KdicSetup/
 ### 7.4. 설정 변경
 * **데이터 삭제 확인 암호:** `dialog.py`의 `ConfirmationDialog` 클래스 내 `_validate_input` 메소드에서 변경할 수 있습니다.
 * **기본 예상 시간:** `controller.py`의 `start_automation` 메소드에서 디스크 타입별(NVMe, SSD, HDD) 기본 예상 시간을 조정할 수 있습니다.
+
+빌드 : python 3.13.7 qt6 6.9.2 
